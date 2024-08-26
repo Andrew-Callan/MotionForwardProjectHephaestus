@@ -1,6 +1,6 @@
 provider "aws" {
   region                  = "${var.region}"
-  shared_credentials_file = "${var.credential_file}"
+  shared_credentials_files = "${var.credential_file}"
 }
 
 ##Creation of attacker and victim VPCs
@@ -8,8 +8,8 @@ provider "aws" {
 resource "aws_vpc" "Victim-VPC" {
   cidr_block = "${var.VictimVpcCidr}"
 
-  tags {
-    Name    = "${var.VictimvpcName}"
+  tags = {
+    Name    = "${var.VictimVpcName}"
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -18,8 +18,8 @@ resource "aws_vpc" "Victim-VPC" {
 resource "aws_vpc" "Attacker-VPC" {
   cidr_block = "${var.AttackerVpcCidr}"
 
-  tags {
-    Name    = "${var.AttackervpcName}"
+  tags = {
+    Name    = "${var.AttackerVpcName}"
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -31,7 +31,7 @@ resource "aws_subnet" "VictimPublic1" {
   vpc_id            = "${aws_vpc.Victim-VPC.id}"
   cidr_block        = "${var.VictimPublic1Cidr}"
 
-  tags {
+  tags = {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -42,7 +42,7 @@ resource "aws_subnet" "VictimPrivate1" {
   vpc_id     = "${aws_vpc.Victim-VPC.id}"
   cidr_block = "${var.VictimPrivate1Cidr}"
 
-  tags {
+  tags = {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -53,18 +53,18 @@ resource "aws_subnet" "AttackerPublic1" {
   vpc_id            = "${aws_vpc.Attacker-VPC.id}"
   cidr_block        = "${var.AttackerPublic1Cidr}"
 
-  tags {
+  tags = {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
 }
 
-## Internet and NAT gateway creation
+## Internet gateway creation
 
 resource "aws_internet_gateway" "VictimIgw" {
   vpc_id = "${aws_vpc.Victim-VPC.id}"
 
-  tags {
+  tags = {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -73,17 +73,23 @@ resource "aws_internet_gateway" "VictimIgw" {
 resource "aws_internet_gateway" "AttackerIgw" {
   vpc_id = "${aws_vpc.Attacker-VPC.id}"
 
-  tags {
+  tags = {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
 }
 
+### EIP Creation ###
+
+resource "aws_eip" "natgwEip" {
+  vpc = true
+}
+
 resource "aws_nat_gateway" "natgw" {
-  allocation_id = "${aws_eip.natEip.id}"
+  allocation_id = "${aws_eip.natgwEip.id}"
   subnet_id     = "${aws_subnet.VictimPrivate1.id}"
 
-  tags {
+  tags = {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
