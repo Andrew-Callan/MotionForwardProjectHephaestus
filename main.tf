@@ -59,13 +59,34 @@ resource "aws_subnet" "AttackerPublic1" {
   }
 }
 
+## Internet and NAT gateway creation
 
-resource "aws_subnet" "Attackerprivate1" {
-  vpc_id     = "${aws_vpc.Attacker-VPC.id}"
-  cidr_block = "${var.VAttackerPrivate1Cidr}"
+resource "aws_internet_gateway" "VictimIgw" {
+  vpc_id = "${aws_vpc.Victim-VPC.id}"
 
   tags {
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
 }
+
+resource "aws_internet_gateway" "AttackerIgw" {
+  vpc_id = "${aws_vpc.Attacker-VPC.id}"
+
+  tags {
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_nat_gateway" "natgw" {
+  allocation_id = "${aws_eip.natEip.id}"
+  subnet_id     = "${aws_subnet.VictimPrivate1.id}"
+
+  tags {
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+
