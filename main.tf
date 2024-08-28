@@ -131,7 +131,7 @@ resource "aws_route_table" "AttackerPublicRouteTable" {
 
 resource "aws_route_table_association" "VictimPublicRTA" {
   subnet_id      = "${aws_subnet.VictimPublic1.id}"
-  route_table_id = "${aws_route_table.VictimPrivateRouteTable.id}"
+  route_table_id = "${aws_route_table.VictimPublicRouteTable.id}"
 }
 
 resource "aws_route_table_association" "VictimPrivateRTA" {
