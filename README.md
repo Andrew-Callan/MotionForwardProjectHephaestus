@@ -169,13 +169,13 @@ This project is licensed under the GNU License - see the [LICENSE](LICENSE) file
 
 For any questions or support, please reach out to:
 
-- **Email**: support@example.com
+- **Email**: andrew@mftechinc.com
 - **GitHub Issues**: [Project Hephaestus Issues](https://github.com/yourusername/project-hephaestus/issues)
 
 ## Acknowledgements
 
 - **Terraform**: Infrastructure as Code tool that makes provisioning easy.
 - **Ansible**: Configuration management tool used for setting up and maintaining the environment.
-- **Cloud Providers**: AWS, Azure, and GCP for providing the cloud infrastructure.
+- **Cloud Providers**: AWS for providing the cloud infrastructure.
 
 ---
