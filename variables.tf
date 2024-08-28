@@ -17,3 +17,12 @@ variable "AttackerVpcName" {}
 variable "VictimPublic1Cidr" {}
 variable "VictimPrivate1Cidr" {}
 variable "AttackerPublic1Cidr" {}
+
+variable "VictimAmi" {}
+variable "AttackerAmi" {}
+variable "VictimInstanceType" {}
+variable "AttackerInstanceType" {}
+variable "VictimVolumeSize" {}
+variable "AttackerVolumeSize" {}
+variable "VictimKeyName" {}
+variable "AttackerKeyName" {}

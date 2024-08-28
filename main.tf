@@ -3,7 +3,7 @@ provider "aws" {
   shared_credentials_files = "${var.credential_file}"
 }
 
-##Creation of attacker and victim VPCs
+### Creation of attacker and victim VPCs ###
 
 resource "aws_vpc" "Victim-VPC" {
   cidr_block = "${var.VictimVpcCidr}"
@@ -59,7 +59,7 @@ resource "aws_subnet" "AttackerPublic1" {
   }
 }
 
-## Internet gateway creation
+### Internet gateway creation ###
 
 resource "aws_internet_gateway" "VictimIgw" {
   vpc_id = "${aws_vpc.Victim-VPC.id}"
@@ -140,4 +140,103 @@ resource "aws_route_table_association" "VictimPrivateRTA" {
 resource "aws_route_table_association" "AttackerPublicRTA" {
   subnet_id      = "${aws_subnet.AttackerPublic1.id}"
   route_table_id = "${aws_route_table.AttackerPublicRouteTable.id}"
+}
+
+
+### Security Group Creation ###
+
+resource "aws_security_group" "AttackerAllowAll" {
+  name        = "allow_all"
+  description = "Allow all inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.Attacker-VPC.id
+  ingress {
+    from_port   = "0"
+    to_port     = "0"
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = "0"
+    to_port     = "0"
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name    = "${var.project}-AllowAll"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_security_group" "VictimAllowAll" {
+  name        = "allow_all"
+  description = "Allow all inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.Victim-VPC.id
+  ingress {
+    from_port   = "0"
+    to_port     = "0"
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = "0"
+    to_port     = "0"
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name    = "${var.project}-AllowAll"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+### EC2 Instance Creation ###
+
+resource "aws_instance" "VictimMachine" {
+  ami           = "${var.VictimAmi}"
+  instance_type = "${var.VictimInstanceType}"
+
+  key_name                    = "${var.VictimKeyName}"
+  associate_public_ip_address = false
+  subnet_id                   = "${aws_subnet.VictimPrivate1.id}"
+  vpc_security_group_ids      = ["${aws_security_group.VictimAllowAll.id}"]
+  root_block_device {
+    volume_size = "${var.VictimVolumeSize}"
+    tags = {
+        Name    = "${var.owner}-VictimRootDevice"
+        Owner   = "${var.owner}"
+        Project = "${var.project}"
+    }
+  }
+
+  tags = {
+    Name    = "${var.owner}-VictimMachine"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_instance" "AttackerMachine" {
+  ami           = "${var.AttackerAmi}"
+  instance_type = "${var.AttackerInstanceType}"
+
+  key_name                    = "${var.AttackerKeyName}"
+  associate_public_ip_address = false
+  subnet_id                   = "${aws_subnet.AttackerPublic1.id}"
+  vpc_security_group_ids      = ["${aws_security_group.AttackerAllowAll.id}"]
+  root_block_device {
+    volume_size = "${var.AttackerVolumeSize}"
+    tags = {
+        Name    = "${var.owner}-AttackerRootDevice"
+        Owner   = "${var.owner}"
+        Project = "${var.project}"
+    }
+  }
+
+  tags = {
+    Name    = "${var.owner}-AttackermMachine"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
 }
