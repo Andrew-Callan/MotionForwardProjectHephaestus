@@ -12,11 +12,9 @@ Certainly! Here’s a detailed README file for the “Project Hephaestus” Terr
 2. [Installation](#installation)
 3. [Usage](#usage)
 4. [Configuration](#configuration)
-5. [API Reference](#api-reference)
-6. [Contributing](#contributing)
-7. [License](#license)
-8. [Contact Information](#contact-information)
-9. [Acknowledgements](#acknowledgements)
+5. [License](#license)
+6. [Contact Information](#contact-information)
+7. [Acknowledgements](#acknowledgements)
 
 ## Project Title and Description
 
@@ -34,6 +32,7 @@ Certainly! Here’s a detailed README file for the “Project Hephaestus” Terr
 
 - [Terraform](https://www.terraform.io/downloads.html) (v1.9.5 used for dev)
 - [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)
+- [Python3] (https://www.python.org/downloads/) (Version 3.9.6 used for dev)
 - Access to a cloud provider (e.g., AWS, Azure, GCP) and proper credentials set up.
 
 ### Clone the Repository
@@ -62,6 +61,55 @@ cd MotionForwardProjectHephaestus
     ```bash
     terraform apply
     ```
+
+### Variable Configuration
+
+### 1. Extract Terraform Output
+
+First, ensure that your Terraform configuration outputs the necessary values. For example, you might have the following Terraform configuration:
+
+```hcl
+# terraform/outputs.tf
+output "public_ip" {
+  value = aws_instance.example.public_ip
+}
+
+output "private_ip" {
+  value = aws_instance.example.private_ip
+}
+```
+
+To extract these outputs, you can use the `terraform output` command:
+
+```bash
+terraform output -json > terraform_outputs.json
+```
+
+This command will create a `terraform_outputs.json` file containing all the outputs in JSON format.
+
+### 2. Generate Ansible Variables File
+```bash
+python generate_ansible_vars.py
+```
+
+This will generate an `ansible_vars.yml` file with the Terraform outputs in a format that Ansible can use.
+
+### Example YAML Output
+
+The generated `ansible_vars.yml` might look like this:
+
+```yaml
+private_ip: "10.0.0.1"
+public_ip: "54.123.45.67"
+```
+
+### Using the Variables in Ansible
+
+You can now use this file as an inventory or variables file in your Ansible playbooks. For example, you can include it in your `ansible-playbook` command:
+
+```bash
+ansible-playbook -i inventory/hosts playbook.yml --extra-vars @ansible_vars.yml
+```
 
 ### Ansible Setup
 
