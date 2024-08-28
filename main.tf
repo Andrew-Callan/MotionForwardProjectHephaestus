@@ -240,3 +240,27 @@ resource "aws_instance" "AttackerMachine" {
     Project = "${var.project}"
   }
 }
+
+### Networking Resources to Allow communication between Victim and Attacker VPCs ###
+
+resource "aws_vpc_peering_connection" "AttackerVictimVPCPeering" {
+  peer_vpc_id   = aws_vpc.Victim-VPC.id
+  vpc_id        = aws_vpc.Attacker-VPC.id
+  auto_accept   = true
+
+  tags = {
+    Name = "VPC Peering between Attacker and Victim"
+  }
+}
+
+resource "aws_route" "VictimToAttackerRoute" {
+  route_table_id         = aws_route_table.VictimPublicRouteTable.id
+  destination_cidr_block = aws_vpc.Attacker-VPC.cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
+}
+
+resource "aws_route" "AttackerToVictimRoute" {
+  route_table_id         = aws_route_table.AttackerPublicRouteTable.id
+  destination_cidr_block = aws_vpc.Victim-VPC.cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
+}
