@@ -30,6 +30,7 @@ resource "aws_vpc" "Attacker-VPC" {
 resource "aws_subnet" "VictimPublic1" {
   vpc_id            = "${aws_vpc.Victim-VPC.id}"
   cidr_block        = "${var.VictimPublic1Cidr}"
+  availability_zone = "${var.region}a"
 
   tags = {
     Owner   = "${var.owner}"
@@ -41,6 +42,7 @@ resource "aws_subnet" "VictimPublic1" {
 resource "aws_subnet" "VictimPrivate1" {
   vpc_id     = "${aws_vpc.Victim-VPC.id}"
   cidr_block = "${var.VictimPrivate1Cidr}"
+  availability_zone = "${var.region}a"
 
   tags = {
     Owner   = "${var.owner}"
@@ -241,6 +243,51 @@ resource "aws_instance" "AttackerMachine" {
   }
 }
 
+### Security Device ENI Creation ###
+
+resource "aws_network_interface" "SecurityEni_a" {
+  subnet_id       = aws_subnet.VictimPublic1.id
+  security_groups  = aws_security_group.VictimAllowAll.id
+}
+
+resource "aws_network_interface" "SecurityEni_b" {
+  subnet_id       = aws_subnet.VictimPrivate1.id
+  security_groups  = aws_security_group.VictimAllowAll.id
+}
+
+### Security Device EC2 Instance ###
+
+resource "aws_instance" "SecurityDevice" {
+  ami           = "${var.SecurityAmi}"
+  instance_type = "${var.SecurityInstanceType}"
+
+  key_name                    = "${var.SecurityKeyName}"
+  associate_public_ip_address = true
+  subnet_id                   = "${aws_subnet.VictimPublic1.id}"
+  vpc_security_group_ids      = ["${aws_security_group.VictimAllowAll.id}"]
+  root_block_device {
+    volume_size = "${var.SecurityVolumeSize}"
+    tags = {
+        Name    = "${var.owner}-SecurityDevice"
+        Owner   = "${var.owner}"
+        Project = "${var.project}"
+    }
+  }
+  network_interface {
+    network_interface_id = aws_network_interface.SecurityEni_a.id
+    device_index         = 0
+  }
+
+  network_interface {
+    network_interface_id = aws_network_interface.SecurityEni_b.id
+    device_index         = 1
+  }
+  tags = {
+    Name    = "${var.owner}-VictimMachine"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
 ### Networking Resources to Allow communication between Victim and Attacker VPCs ###
 
 resource "aws_vpc_peering_connection" "AttackerVictimVPCPeering" {
@@ -263,4 +310,10 @@ resource "aws_route" "AttackerToVictimRoute" {
   route_table_id         = aws_route_table.AttackerPublicRouteTable.id
   destination_cidr_block = aws_vpc.Victim-VPC.cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
+}
+
+resource "aws_route" "RouteThroughSecurityDevice" {
+  route_table_id         = aws_route_table.AttackerPublicRouteTable.id
+  destination_cidr_block = "${var.VictimPrivate1Cidr}"
+  network_interface_id = aws_network_interface.SecurityEni_a.id
 }

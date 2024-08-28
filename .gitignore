@@ -1,3 +1,4 @@
 .terraform*
 .terraform.lock.hcl
 scratchpad.txt
+graph.dot

@@ -20,9 +20,13 @@ variable "AttackerPublic1Cidr" {}
 
 variable "VictimAmi" {}
 variable "AttackerAmi" {}
+variable "SecurityAmi" {}
 variable "VictimInstanceType" {}
 variable "AttackerInstanceType" {}
+variable "SecurityInstanceType" {}
 variable "VictimVolumeSize" {}
 variable "AttackerVolumeSize" {}
+variable "SecurityVolumeSize" {}
 variable "VictimKeyName" {}
 variable "AttackerKeyName" {}
+variable "SecurityKeyName" {}
