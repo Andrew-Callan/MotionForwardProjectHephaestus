@@ -79,13 +79,13 @@ resource "aws_internet_gateway" "AttackerIgw" {
   }
 }
 
-### EIP Creation ###
+### EIP and NatGW Creation ###
 
 resource "aws_eip" "natgwEip" {
-  vpc = true
+    domain = "vpc"
 }
 
-resource "aws_nat_gateway" "natgw" {
+resource "aws_nat_gateway" "VictimNatgw" {
   allocation_id = "${aws_eip.natgwEip.id}"
   subnet_id     = "${aws_subnet.VictimPrivate1.id}"
 
@@ -96,3 +96,48 @@ resource "aws_nat_gateway" "natgw" {
 }
 
 
+### Creating Public and Private Subnet Route Tables ###
+
+resource "aws_route_table" "VictimPublicRouteTable" {
+  vpc_id = "${aws_vpc.Victim-VPC.id}"
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.VictimIgw.id}"
+  }
+}
+
+resource "aws_route_table" "VictimPrivateRouteTable" {
+  vpc_id = "${aws_vpc.Victim-VPC.id}"
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = "${aws_nat_gateway.VictimNatgw.id}"
+  }
+}
+
+resource "aws_route_table" "AttackerPublicRouteTable" {
+  vpc_id = "${aws_vpc.Attacker-VPC.id}"
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = "${aws_internet_gateway.AttackerIgw.id}"
+  }
+}
+
+### Associating Subnets with Route Tables ###
+
+resource "aws_route_table_association" "VictimPublicRTA" {
+  subnet_id      = "${aws_subnet.VictimPublic1.id}"
+  route_table_id = "${aws_route_table.VictimPrivateRouteTable.id}"
+}
+
+resource "aws_route_table_association" "VictimPrivateRTA" {
+  subnet_id      = "${aws_subnet.VictimPrivate1.id}"
+  route_table_id = "${aws_route_table.VictimPrivateRouteTable.id}"
+}
+
+resource "aws_route_table_association" "AttackerPublicRTA" {
+  subnet_id      = "${aws_subnet.AttackerPublic1.id}"
+  route_table_id = "${aws_route_table.AttackerPublicRouteTable.id}"
+}
