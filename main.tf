@@ -135,7 +135,7 @@ resource "aws_route_table" "AttackerPublicRouteTable" {
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = "${aws_internet_gateway.AttackerIgw.id}"
+    gateway_id = "${aws_internet_gateway.AttackerIgw.id}"
   }
 }
 
@@ -257,9 +257,16 @@ resource "aws_instance" "AttackerMachine" {
 
 ### Security Device ENI Creation ###
 
+
+
+
 resource "aws_network_interface" "SecurityEni_a" {
   subnet_id       = aws_subnet.VictimPublic1.id
   security_groups  = [aws_security_group.VictimAllowAll.id]
+}
+resource "aws_eip" "SecurityDevicePublicEIP" {
+  domain                    = "vpc"
+  network_interface         = "${aws_network_interface.SecurityEni_a.id}"
 }
 
 resource "aws_network_interface" "SecurityEni_b" {
@@ -274,9 +281,9 @@ resource "aws_instance" "SecurityDevice" {
   instance_type = "${var.SecurityInstanceType}"
 
   key_name                    = "${var.SecurityKeyName}"
-  associate_public_ip_address = true
-  subnet_id                   = "${aws_subnet.VictimPublic1.id}"
-  vpc_security_group_ids      = ["${aws_security_group.VictimAllowAll.id}"]
+  #associate_public_ip_address = true
+  #subnet_id                   = "${aws_subnet.VictimPublic1.id}"
+  #vpc_security_group_ids      = ["${aws_security_group.VictimAllowAll.id}"]
   root_block_device {
     volume_size = "${var.SecurityVolumeSize}"
     tags = {
@@ -300,6 +307,7 @@ resource "aws_instance" "SecurityDevice" {
     Project = "${var.project}"
   }
 }
+
 ### Networking Resources to Allow communication between Victim and Attacker VPCs ###
 
 resource "aws_vpc_peering_connection" "AttackerVictimVPCPeering" {
@@ -324,8 +332,10 @@ resource "aws_route" "AttackerToVictimRoute" {
   vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
 }
 
+/*
 resource "aws_route" "RouteThroughSecurityDevice" {
   route_table_id         = aws_route_table.AttackerPublicRouteTable.id
   destination_cidr_block = "${var.VictimPrivate1Cidr}"
   network_interface_id = aws_network_interface.SecurityEni_a.id
 }
+*/

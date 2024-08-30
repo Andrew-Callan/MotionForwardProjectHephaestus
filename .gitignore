@@ -4,3 +4,5 @@ scratchpad.txt
 graph.dot
 .aws*
 .aws/*
+terraform.tfstate
+terraform.tfstate.backup
