@@ -320,22 +320,20 @@ resource "aws_vpc_peering_connection" "AttackerVictimVPCPeering" {
   }
 }
 
-resource "aws_route" "VictimToAttackerRoute" {
+resource "aws_route" "VictimPublicToAttackerRoute" {
   route_table_id         = aws_route_table.VictimPublicRouteTable.id
   destination_cidr_block = aws_vpc.Attacker-VPC.cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
 }
+resource "aws_route" "VictimPrivateToAttackerRoute" {
+  route_table_id         = aws_route_table.VictimPrivateRouteTable.id
+  destination_cidr_block = aws_vpc.Attacker-VPC.cidr_block
+  network_interface_id = aws_network_interface.SecurityEni_b.id
+}
+
 
 resource "aws_route" "AttackerToVictimRoute" {
   route_table_id         = aws_route_table.AttackerPublicRouteTable.id
   destination_cidr_block = aws_vpc.Victim-VPC.cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
 }
-
-/*
-resource "aws_route" "RouteThroughSecurityDevice" {
-  route_table_id         = aws_route_table.AttackerPublicRouteTable.id
-  destination_cidr_block = "${var.VictimPrivate1Cidr}"
-  network_interface_id = aws_network_interface.SecurityEni_a.id
-}
-*/
