@@ -2,6 +2,10 @@ variable "credential_file" {
   default = "/home/ec2-user/.aws/credentials"
 }
 
+variable "config_file" {
+  default = "/home/ec2-user/.aws/config"
+}
+
 variable "owner" {}
 variable "project" {}
 variable "vendor" {}

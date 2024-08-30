@@ -1,6 +1,18 @@
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region                  = "${var.region}"
-  shared_credentials_files = "${var.credential_file}"
+  shared_credentials_files = ["${var.credential_file}"]
+  shared_config_files = ["${var.config_file}"]
+  #profile = "default"
 }
 
 ### Creation of attacker and victim VPCs ###
@@ -247,12 +259,12 @@ resource "aws_instance" "AttackerMachine" {
 
 resource "aws_network_interface" "SecurityEni_a" {
   subnet_id       = aws_subnet.VictimPublic1.id
-  security_groups  = aws_security_group.VictimAllowAll.id
+  security_groups  = [aws_security_group.VictimAllowAll.id]
 }
 
 resource "aws_network_interface" "SecurityEni_b" {
   subnet_id       = aws_subnet.VictimPrivate1.id
-  security_groups  = aws_security_group.VictimAllowAll.id
+  security_groups  = [aws_security_group.VictimAllowAll.id]
 }
 
 ### Security Device EC2 Instance ###
