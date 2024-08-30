@@ -2,4 +2,5 @@
 .terraform.lock.hcl
 scratchpad.txt
 graph.dot
-credentials
+.aws*
+.aws/*
