@@ -1,7 +1,3 @@
-Certainly! Here’s a detailed README file for the “Project Hephaestus” Terraform and Ansible codebase:
-
----
-
 # Project Hephaestus
 
 **Project Hephaestus** is a robust infrastructure provisioning solution that leverages Terraform and Ansible to create a dynamic cloud networking environment. Designed specifically for red teaming / blue teaming exercises, it sets up machines and networks that simulate increasing levels of difficulty as attackers progress, providing a comprehensive training ground for cybersecurity professionals.
