@@ -236,7 +236,7 @@ resource "aws_instance" "AttackerMachine" {
   instance_type = "${var.AttackerInstanceType}"
 
   key_name                    = "${var.AttackerKeyName}"
-  associate_public_ip_address = false
+  associate_public_ip_address = true
   subnet_id                   = "${aws_subnet.AttackerPublic1.id}"
   vpc_security_group_ids      = ["${aws_security_group.AttackerAllowAll.id}"]
   root_block_device {
@@ -302,7 +302,7 @@ resource "aws_instance" "SecurityDevice" {
     device_index         = 1
   }
   tags = {
-    Name    = "${var.owner}-VictimMachine"
+    Name    = "${var.owner}-SecurityMachine"
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
