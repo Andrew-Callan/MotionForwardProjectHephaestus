@@ -15,13 +15,23 @@ provider "aws" {
   #profile = "default"
 }
 
-### Creation of attacker and victim VPCs ###
+### Creation of attacker, security, and victim VPCs ###
 
 resource "aws_vpc" "Victim-VPC" {
   cidr_block = "${var.VictimVpcCidr}"
 
   tags = {
     Name    = "${var.VictimVpcName}"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_vpc" "Security-VPC" {
+  cidr_block = "${var.SecurityVpcCidr}"
+
+  tags = {
+    Name    = "${var.SecurityVpcName}"
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -63,6 +73,17 @@ resource "aws_subnet" "VictimPrivate1" {
 }
 
 
+resource "aws_subnet" "SecurityPublic1" {
+  vpc_id            = "${aws_vpc.Security-VPC.id}"
+  cidr_block        = "${var.SecurityPublic1Cidr}"
+  availability_zone = "${var.region}a"
+
+  tags = {
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
 resource "aws_subnet" "AttackerPublic1" {
   vpc_id            = "${aws_vpc.Attacker-VPC.id}"
   cidr_block        = "${var.AttackerPublic1Cidr}"
@@ -77,6 +98,15 @@ resource "aws_subnet" "AttackerPublic1" {
 
 resource "aws_internet_gateway" "VictimIgw" {
   vpc_id = "${aws_vpc.Victim-VPC.id}"
+
+  tags = {
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_internet_gateway" "SecurityIgw" {
+  vpc_id = "${aws_vpc.Security-VPC.id}"
 
   tags = {
     Owner   = "${var.owner}"
@@ -130,6 +160,15 @@ resource "aws_route_table" "VictimPrivateRouteTable" {
   }
 }
 
+resource "aws_route_table" "SecurityPublicRouteTable" {
+  vpc_id = "${aws_vpc.Security-VPC.id}"
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.SecurityIgw.id}"
+  }
+}
+
 resource "aws_route_table" "AttackerPublicRouteTable" {
   vpc_id = "${aws_vpc.Attacker-VPC.id}"
 
@@ -149,6 +188,11 @@ resource "aws_route_table_association" "VictimPublicRTA" {
 resource "aws_route_table_association" "VictimPrivateRTA" {
   subnet_id      = "${aws_subnet.VictimPrivate1.id}"
   route_table_id = "${aws_route_table.VictimPrivateRouteTable.id}"
+}
+
+resource "aws_route_table_association" "SecurityPublicRTA" {
+  subnet_id      = "${aws_subnet.SecurityPublic1.id}"
+  route_table_id = "${aws_route_table.SecurityPublicRouteTable.id}"
 }
 
 resource "aws_route_table_association" "AttackerPublicRTA" {
@@ -186,6 +230,29 @@ resource "aws_security_group" "VictimAllowAll" {
   name        = "allow_all"
   description = "Allow all inbound traffic and all outbound traffic"
   vpc_id      = aws_vpc.Victim-VPC.id
+  ingress {
+    from_port   = "0"
+    to_port     = "0"
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = "0"
+    to_port     = "0"
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name    = "${var.project}-AllowAll"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_security_group" "SecurityAllowAll" {
+  name        = "allow_all"
+  description = "Allow all inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.Security-VPC.id
   ingress {
     from_port   = "0"
     to_port     = "0"
@@ -249,7 +316,7 @@ resource "aws_instance" "AttackerMachine" {
   }
 
   tags = {
-    Name    = "${var.owner}-AttackermMachine"
+    Name    = "${var.owner}-AttackerMachine"
     Owner   = "${var.owner}"
     Project = "${var.project}"
   }
@@ -258,21 +325,25 @@ resource "aws_instance" "AttackerMachine" {
 ### Security Device ENI Creation ###
 
 
-
-
 resource "aws_network_interface" "SecurityEni_a" {
-  subnet_id       = aws_subnet.VictimPublic1.id
-  security_groups  = [aws_security_group.VictimAllowAll.id]
+  subnet_id       = aws_subnet.SecurityPublic1.id
+  security_groups  = [aws_security_group.SecurityAllowAll.id]
 }
 resource "aws_eip" "SecurityDevicePublicEIP" {
   domain                    = "vpc"
+  depends_on = [
+    aws_network_interface.SecurityEni_a
+  ]
   network_interface         = "${aws_network_interface.SecurityEni_a.id}"
 }
 
+/*
+Additional interface no longer needed because of transit gateway
 resource "aws_network_interface" "SecurityEni_b" {
-  subnet_id       = aws_subnet.VictimPrivate1.id
-  security_groups  = [aws_security_group.VictimAllowAll.id]
+  subnet_id       = aws_subnet.SecurityPublic2.id
+  security_groups  = [aws_security_group.SecurityAllowAll.id]
 }
+*/
 
 ### Security Device EC2 Instance ###
 
@@ -296,11 +367,6 @@ resource "aws_instance" "SecurityDevice" {
     network_interface_id = aws_network_interface.SecurityEni_a.id
     device_index         = 0
   }
-
-  network_interface {
-    network_interface_id = aws_network_interface.SecurityEni_b.id
-    device_index         = 1
-  }
   tags = {
     Name    = "${var.owner}-SecurityMachine"
     Owner   = "${var.owner}"
@@ -308,6 +374,8 @@ resource "aws_instance" "SecurityDevice" {
   }
 }
 
+/*
+DEPRACATED - Using Transit Gateway instead
 ### Networking Resources to Allow communication between Victim and Attacker VPCs ###
 
 resource "aws_vpc_peering_connection" "AttackerVictimVPCPeering" {
@@ -337,3 +405,4 @@ resource "aws_route" "AttackerToVictimRoute" {
   destination_cidr_block = aws_vpc.Victim-VPC.cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
 }
+*/

@@ -9,10 +9,13 @@ region = "us-east-1"
 
 VictimVpcCidr = "192.168.0.0/17"
 VictimVpcName = "VictimVPC"
+SecurityVpcCidr = "10.0.0.0/16"
+SecurityVpcName = "SecurityVPC"
 AttackerVpcCidr = "192.168.128.0/17"
 AttackerVpcName = "AttackerVPC"
 VictimPublic1Cidr = "192.168.1.0/24"
 VictimPrivate1Cidr = "192.168.2.0/24"
+SecurityPublic1Cidr = "10.0.1.0/24"
 AttackerPublic1Cidr = "192.168.128.0/24"
 
 VictimAmi = "ami-066784287e358dad1"

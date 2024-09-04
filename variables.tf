@@ -15,11 +15,14 @@ variable "region" {
 }
 
 variable "VictimVpcCidr" {}
+variable "SecurityVpcCidr" {}
 variable "VictimVpcName" {}
+variable "SecurityVpcName" {}
 variable "AttackerVpcCidr" {}
 variable "AttackerVpcName" {}
 variable "VictimPublic1Cidr" {}
 variable "VictimPrivate1Cidr" {}
+variable "SecurityPublic1Cidr" {}
 variable "AttackerPublic1Cidr" {}
 
 variable "VictimAmi" {}
