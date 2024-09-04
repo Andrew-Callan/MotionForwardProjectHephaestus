@@ -337,13 +337,6 @@ resource "aws_eip" "SecurityDevicePublicEIP" {
   network_interface         = "${aws_network_interface.SecurityEni_a.id}"
 }
 
-/*
-Additional interface no longer needed because of transit gateway
-resource "aws_network_interface" "SecurityEni_b" {
-  subnet_id       = aws_subnet.SecurityPublic2.id
-  security_groups  = [aws_security_group.SecurityAllowAll.id]
-}
-*/
 
 ### Security Device EC2 Instance ###
 
@@ -374,6 +367,7 @@ resource "aws_instance" "SecurityDevice" {
   }
 }
 
+#################################################################
 /*
 DEPRACATED - Using Transit Gateway instead
 ### Networking Resources to Allow communication between Victim and Attacker VPCs ###
@@ -406,3 +400,90 @@ resource "aws_route" "AttackerToVictimRoute" {
   vpc_peering_connection_id = aws_vpc_peering_connection.AttackerVictimVPCPeering.id
 }
 */
+#################################################################
+
+# TRANSIT GATEWAY AND ROUTES CREATION
+
+#Create gateway
+resource "aws_ec2_transit_gateway" "HephTransitGateway" {
+      tags = {
+    Name = "VPC Peering between Attacker and Victim through security VPC"
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+# Create Transit Gateway VPC Attachments
+resource "aws_ec2_transit_gateway_vpc_attachment" "VictimVPC_attachment" {
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+  vpc_id = aws_vpc.Victim-VPC.id
+  subnet_ids = [aws_subnet.VictimPublic1.id]
+}
+
+resource "aws_ec2_transit_gateway_vpc_attachment" "AttackerVPC_attachment" {
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+  vpc_id = aws_vpc.Attacker-VPC.id
+  subnet_ids = [aws_subnet.AttackerPublic1.id]
+}
+
+resource "aws_ec2_transit_gateway_vpc_attachment" "SecurityVPC_attachment" {
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+  vpc_id = aws_vpc.Security-VPC.id
+  subnet_ids = [aws_subnet.SecurityPublic1.id]
+}
+
+# Create Transit Gateway Route Table
+resource "aws_ec2_transit_gateway_route_table" "tgw_route_table" {
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+}
+
+# Associate route table with Transit Gateway Attachments
+resource "aws_ec2_transit_gateway_route_table_association" "VictimVPC_association" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.VictimVPC_attachment.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_association" "AttackerVPC_association" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.AttackerVPC_attachment.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_association" "SecurityVPC_association" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
+}
+
+# Define routes in the Transit Gateway Route Table to route traffic through Security VPC
+resource "aws_ec2_transit_gateway_route" "route_from_victimvpc" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+  destination_cidr_block = "192.168.128.0/17"
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
+}
+
+resource "aws_ec2_transit_gateway_route" "route_from_attackervpc" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+  destination_cidr_block = "192.168.0.0/17"
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
+}
+
+# Add routes in each VPC's route table to direct traffic to the Transit Gateway
+
+resource "aws_route" "VictimVPC_to_tgw" {
+  route_table_id = aws_route_table.VictimPublicRouteTable.id
+  destination_cidr_block = "192.168.128.0/17"
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+}
+
+resource "aws_route" "AttackerVPC_to_tgw" {
+  route_table_id = aws_route_table.AttackerPublicRouteTable.id
+  destination_cidr_block = "192.168.0.0/17"
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+}
+
+resource "aws_route" "SecurityVPC_to_tgw" {
+  route_table_id = aws_route_table.SecurityPublicRouteTable.id
+  destination_cidr_block = "0.0.0.0/0"
+  #transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+  network_interface_id = aws_network_interface.SecurityEni_a.id
+}
+
