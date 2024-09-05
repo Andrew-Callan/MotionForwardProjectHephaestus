@@ -73,9 +73,31 @@ resource "aws_subnet" "VictimPrivate1" {
 }
 
 
-resource "aws_subnet" "SecurityPublic1" {
+resource "aws_subnet" "SecurityNATSubnet" {
   vpc_id            = "${aws_vpc.Security-VPC.id}"
   cidr_block        = "${var.SecurityPublic1Cidr}"
+  availability_zone = "${var.region}a"
+
+  tags = {
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_subnet" "SecurityFirewallSubnet" {
+  vpc_id            = "${aws_vpc.Security-VPC.id}"
+  cidr_block        = "${var.SecurityPublic2Cidr}"
+  availability_zone = "${var.region}a"
+
+  tags = {
+    Owner   = "${var.owner}"
+    Project = "${var.project}"
+  }
+}
+
+resource "aws_subnet" "SecurityTGWSubnet" {
+  vpc_id            = "${aws_vpc.Security-VPC.id}"
+  cidr_block        = "${var.SecurityPrivate1Cidr}"
   availability_zone = "${var.region}a"
 
   tags = {
@@ -160,13 +182,14 @@ resource "aws_route_table" "VictimPrivateRouteTable" {
   }
 }
 
-resource "aws_route_table" "SecurityPublicRouteTable" {
+resource "aws_route_table" "SecurityNATRouteTable" {
   vpc_id = "${aws_vpc.Security-VPC.id}"
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.SecurityIgw.id}"
-  }
+}
+resource "aws_route_table" "SecurityFirewallRouteTable" {
+  vpc_id = "${aws_vpc.Security-VPC.id}"
+}
+resource "aws_route_table" "SecurityTGWRouteTable" {
+  vpc_id = "${aws_vpc.Security-VPC.id}"
 }
 
 resource "aws_route_table" "AttackerPublicRouteTable" {
@@ -190,9 +213,19 @@ resource "aws_route_table_association" "VictimPrivateRTA" {
   route_table_id = "${aws_route_table.VictimPrivateRouteTable.id}"
 }
 
-resource "aws_route_table_association" "SecurityPublicRTA" {
-  subnet_id      = "${aws_subnet.SecurityPublic1.id}"
-  route_table_id = "${aws_route_table.SecurityPublicRouteTable.id}"
+resource "aws_route_table_association" "SecurityNATRTA" {
+  subnet_id      = "${aws_subnet.SecurityNATSubnet.id}"
+  route_table_id = "${aws_route_table.SecurityNATRouteTable.id}"
+}
+
+resource "aws_route_table_association" "SecurityFirewallRTA" {
+  subnet_id      = "${aws_subnet.SecurityFirewallSubnet.id}"
+  route_table_id = "${aws_route_table.SecurityFirewallRouteTable.id}"
+}
+
+resource "aws_route_table_association" "SecurityTGWRTA" {
+  subnet_id      = "${aws_subnet.SecurityTGWSubnet.id}"
+  route_table_id = "${aws_route_table.SecurityTGWRouteTable.id}"
 }
 
 resource "aws_route_table_association" "AttackerPublicRTA" {
@@ -326,15 +359,41 @@ resource "aws_instance" "AttackerMachine" {
 
 
 resource "aws_network_interface" "SecurityEni_a" {
-  subnet_id       = aws_subnet.SecurityPublic1.id
+  subnet_id       = aws_subnet.SecurityNATSubnet.id
   security_groups  = [aws_security_group.SecurityAllowAll.id]
+}
+
+resource "time_sleep" "WaitForENI" {
+    create_duration = "30s"
+    depends_on = [
+        aws_network_interface.SecurityEni_a
+    ]
 }
 resource "aws_eip" "SecurityDevicePublicEIP" {
   domain                    = "vpc"
   depends_on = [
-    aws_network_interface.SecurityEni_a
+    time_sleep.WaitForENI
   ]
   network_interface         = "${aws_network_interface.SecurityEni_a.id}"
+}
+
+resource "aws_network_interface" "SecurityEni_b" {
+  subnet_id       = aws_subnet.SecurityFirewallSubnet.id
+  security_groups  = [aws_security_group.SecurityAllowAll.id]
+}
+
+resource "time_sleep" "WaitForENI2" {
+    create_duration = "30s"
+    depends_on = [
+        aws_network_interface.SecurityEni_b
+    ]
+}
+resource "aws_eip" "SecurityDevicePublicEIP2" {
+  domain                    = "vpc"
+  depends_on = [
+    time_sleep.WaitForENI2
+  ]
+  network_interface         = "${aws_network_interface.SecurityEni_b.id}"
 }
 
 
@@ -359,6 +418,10 @@ resource "aws_instance" "SecurityDevice" {
   network_interface {
     network_interface_id = aws_network_interface.SecurityEni_a.id
     device_index         = 0
+  }
+  network_interface {
+    network_interface_id = aws_network_interface.SecurityEni_b.id
+    device_index         = 1
   }
   tags = {
     Name    = "${var.owner}-SecurityMachine"
@@ -406,10 +469,11 @@ resource "aws_route" "AttackerToVictimRoute" {
 
 #Create gateway
 resource "aws_ec2_transit_gateway" "HephTransitGateway" {
-      tags = {
-    Name = "VPC Peering between Attacker and Victim through security VPC"
-    Owner   = "${var.owner}"
-    Project = "${var.project}"
+    default_route_table_association = "disable"
+    tags = {
+        Name = "VPC Peering between Attacker and Victim through security VPC"
+        Owner   = "${var.owner}"
+        Project = "${var.project}"
   }
 }
 
@@ -429,61 +493,95 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "AttackerVPC_attachment" {
 resource "aws_ec2_transit_gateway_vpc_attachment" "SecurityVPC_attachment" {
   transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
   vpc_id = aws_vpc.Security-VPC.id
-  subnet_ids = [aws_subnet.SecurityPublic1.id]
+  subnet_ids = [aws_subnet.SecurityTGWSubnet.id]
 }
 
-# Create Transit Gateway Route Table
-resource "aws_ec2_transit_gateway_route_table" "tgw_route_table" {
+# Create Transit Gateway Route Tables
+resource "aws_ec2_transit_gateway_route_table" "Victim-Attacker_tgw_route_table" {
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+}
+
+resource "aws_ec2_transit_gateway_route_table" "Security_tgw_route_table" {
   transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
 }
 
 # Associate route table with Transit Gateway Attachments
 resource "aws_ec2_transit_gateway_route_table_association" "VictimVPC_association" {
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.Victim-Attacker_tgw_route_table.id
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.VictimVPC_attachment.id
+} 
+
+resource "aws_ec2_transit_gateway_route_table_association" "AttackerVPC_association" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.Victim-Attacker_tgw_route_table.id
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.AttackerVPC_attachment.id
+} 
+
+resource "aws_ec2_transit_gateway_route_table_association" "SecurityVPC_association" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.Security_tgw_route_table.id
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
+} 
+
+
+# Define routes in the Transit Gateway Route Tables to route traffic through Security VPC
+resource "aws_ec2_transit_gateway_route" "route_from_victimvpc" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.Victim-Attacker_tgw_route_table.id
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
+}
+
+resource "aws_ec2_transit_gateway_route" "route_to_victimvpc" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.Security_tgw_route_table.id
+  destination_cidr_block = "${var.VictimVpcCidr}"
   transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.VictimVPC_attachment.id
 }
 
-resource "aws_ec2_transit_gateway_route_table_association" "AttackerVPC_association" {
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
+resource "aws_ec2_transit_gateway_route" "route_to_attackervpc" {
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.Security_tgw_route_table.id
+  destination_cidr_block = "${var.AttackerVpcCidr}"
   transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.AttackerVPC_attachment.id
-}
-
-resource "aws_ec2_transit_gateway_route_table_association" "SecurityVPC_association" {
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
-  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
-}
-
-# Define routes in the Transit Gateway Route Table to route traffic through Security VPC
-resource "aws_ec2_transit_gateway_route" "route_from_victimvpc" {
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
-  destination_cidr_block = "192.168.128.0/17"
-  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
-}
-
-resource "aws_ec2_transit_gateway_route" "route_from_attackervpc" {
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.tgw_route_table.id
-  destination_cidr_block = "192.168.0.0/17"
-  transit_gateway_attachment_id = aws_ec2_transit_gateway_vpc_attachment.SecurityVPC_attachment.id
 }
 
 # Add routes in each VPC's route table to direct traffic to the Transit Gateway
 
+
+resource "aws_route" "SecurityNAT_to_igw" {
+  route_table_id = aws_route_table.SecurityNATRouteTable.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id = "${aws_internet_gateway.SecurityIgw.id}"
+}
+
+resource "aws_route" "SecurityNAT_to_Victim" {
+  route_table_id = aws_route_table.SecurityNATRouteTable.id
+  destination_cidr_block = "${var.VictimVpcCidr}"
+  network_interface_id = aws_network_interface.SecurityEni_b.id
+}
+
+resource "aws_route" "SecurityDeviceOut" {
+  route_table_id = aws_route_table.SecurityFirewallRouteTable.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id = "${aws_internet_gateway.SecurityIgw.id}"
+}
+
+resource "aws_route" "SecurityDeviceToVictim" {
+  route_table_id = aws_route_table.SecurityFirewallRouteTable.id
+  destination_cidr_block = "${var.VictimVpcCidr}"
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+}
+resource "aws_route" "SecurityDeviceToAttacker" {
+  route_table_id = aws_route_table.SecurityFirewallRouteTable.id
+  destination_cidr_block = "${var.AttackerVpcCidr}"
+  transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
+}
+
+
 resource "aws_route" "VictimVPC_to_tgw" {
   route_table_id = aws_route_table.VictimPublicRouteTable.id
-  destination_cidr_block = "192.168.128.0/17"
+  destination_cidr_block = "${var.AttackerVpcCidr}"
   transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
 }
 
 resource "aws_route" "AttackerVPC_to_tgw" {
   route_table_id = aws_route_table.AttackerPublicRouteTable.id
-  destination_cidr_block = "192.168.0.0/17"
+  destination_cidr_block = "${var.VictimVpcCidr}"
   transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
 }
-
-resource "aws_route" "SecurityVPC_to_tgw" {
-  route_table_id = aws_route_table.SecurityPublicRouteTable.id
-  destination_cidr_block = "0.0.0.0/0"
-  #transit_gateway_id = aws_ec2_transit_gateway.HephTransitGateway.id
-  network_interface_id = aws_network_interface.SecurityEni_a.id
-}
-

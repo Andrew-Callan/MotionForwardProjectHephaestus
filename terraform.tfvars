@@ -16,6 +16,8 @@ AttackerVpcName = "AttackerVPC"
 VictimPublic1Cidr = "192.168.1.0/24"
 VictimPrivate1Cidr = "192.168.2.0/24"
 SecurityPublic1Cidr = "10.0.1.0/24"
+SecurityPublic2Cidr = "10.0.2.0/24"
+SecurityPrivate1Cidr = "10.0.10.0/24"
 AttackerPublic1Cidr = "192.168.128.0/24"
 
 VictimAmi = "ami-066784287e358dad1"

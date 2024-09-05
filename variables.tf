@@ -23,6 +23,8 @@ variable "AttackerVpcName" {}
 variable "VictimPublic1Cidr" {}
 variable "VictimPrivate1Cidr" {}
 variable "SecurityPublic1Cidr" {}
+variable "SecurityPublic2Cidr" {}
+variable "SecurityPrivate1Cidr" {}
 variable "AttackerPublic1Cidr" {}
 
 variable "VictimAmi" {}
